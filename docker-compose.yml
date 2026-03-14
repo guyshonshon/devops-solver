@@ -1,0 +1,40 @@
+services:
+  backend:
+    build: ./backend
+    container_name: devops-solver-backend
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:////app/data/devops_solver.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    container_name: devops-solver-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+
+  # Cloudflare tunnel (optional — needs TUNNEL_TOKEN in .env)
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: devops-solver-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - frontend
+    profiles: ["tunnel"]
+
+volumes:
+  data:

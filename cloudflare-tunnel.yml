@@ -1,0 +1,14 @@
+# Cloudflare Tunnel configuration
+# Run: cloudflared tunnel create devops-solver
+# Then: cloudflared tunnel route dns devops-solver your-subdomain.your-domain.com
+# Copy the tunnel token to .env as CLOUDFLARE_TUNNEL_TOKEN
+
+tunnel: devops-solver
+credentials-file: /etc/cloudflared/creds.json
+
+ingress:
+  - hostname: devops-solver.your-domain.com
+    service: http://frontend:80
+  - hostname: api.devops-solver.your-domain.com
+    service: http://backend:8000
+  - service: http_status:404

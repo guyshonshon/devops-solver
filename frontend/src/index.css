@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+:root {
+  --bg:          #0d1117;   /* page background */
+  --surface:     #161c2d;   /* card / panel */
+  --surface-2:   #1c2438;   /* elevated surface */
+  --border:      #253047;   /* default border */
+  --border-2:    #2e3c55;   /* brighter border / hover */
+  --text:        #dde5f0;   /* primary text */
+  --text-2:      #7a8fad;   /* secondary text */
+  --text-3:      #4a607a;   /* muted / placeholder */
+  --accent:      #3b82f6;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", "DM Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #3a4f6e; }
+
+.font-mono { font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace; }
