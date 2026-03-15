@@ -577,8 +577,11 @@ function NextSyncIndicator({ labs, intervalMinutes }: { labs: { last_scraped?: s
       toast(`Sync done${parts.length ? `: ${parts.join(", ")}` : " — no changes"}`, "success");
     },
     onError: (err: unknown) => {
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 403) {
+      const res = (err as { response?: { status?: number; data?: { detail?: string } } })?.response;
+      if (res?.status === 429) {
+        setPinErrorCount((n) => n + 1);
+        toast(res.data?.detail ?? "Too many attempts — try again later", "error");
+      } else if (res?.status === 403) {
         setPinErrorCount((n) => n + 1);
         toast("Wrong PIN — access denied", "error");
       } else {
