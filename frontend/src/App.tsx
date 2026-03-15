@@ -4,6 +4,7 @@ import { Navbar } from "./components/Navbar";
 import { Dashboard } from "./pages/Dashboard";
 import { Labs } from "./pages/Labs";
 import { LabDetail } from "./pages/LabDetail";
+import { Toaster } from "./components/ui/Toaster";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 20_000, retry: 2 } },
@@ -21,6 +22,7 @@ export default function App() {
             <Route path="/labs/:slug" element={<LabDetail />} />
           </Routes>
         </div>
+        <Toaster />
       </BrowserRouter>
     </QueryClientProvider>
   );

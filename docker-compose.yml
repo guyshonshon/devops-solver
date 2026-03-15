@@ -10,9 +10,10 @@ services:
       - DATABASE_URL=sqlite:////app/data/devops_solver.db
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   frontend:
     build: ./frontend

@@ -1,16 +1,29 @@
 import axios from "axios";
 import { Lab, LabDetail, Solution } from "../types";
 
-const api = axios.create({ baseURL: "/api" });
+const api = axios.create({
+  baseURL: "/api",
+  headers: import.meta.env.VITE_API_KEY
+    ? { "X-API-Key": import.meta.env.VITE_API_KEY as string }
+    : {},
+});
+
+export const configApi = {
+  health: (): Promise<{ status: string; version: string; scrape_interval_minutes: number }> =>
+    api.get("/health").then((r) => r.data),
+};
 
 export const labsApi = {
   list: (): Promise<Lab[]> => api.get("/labs/").then((r) => r.data),
   get: (slug: string): Promise<LabDetail> => api.get(`/labs/${slug}`).then((r) => r.data),
-  solve: (slug: string, execute = false): Promise<{ message: string; solution: Solution }> =>
-    api.post(`/labs/${slug}/solve`, { lab_slug: slug, execute }).then((r) => r.data),
+  // force=true bypasses the cache and regenerates with AI
+  solve: (slug: string, execute = false, force = false): Promise<{ message: string; solution: Solution }> =>
+    api.post(`/labs/${slug}/solve`, { lab_slug: slug, execute, force }).then((r) => r.data),
   replay: (slug: string): Promise<Solution> => api.post(`/labs/${slug}/replay`).then((r) => r.data),
   pushGitHub: (slug: string): Promise<{ success: boolean; pr_url?: string; message?: string }> =>
     api.post(`/labs/${slug}/push-github`).then((r) => r.data),
   sync: (): Promise<{ added: number; updated: number }> =>
     api.post("/labs/sync").then((r) => r.data),
+  reResolveAll: (): Promise<{ cleared: number; queued: number }> =>
+    api.post("/labs/admin/re-solve-all").then((r) => r.data),
 };

@@ -1,14 +1,18 @@
 import { motion } from "framer-motion";
 import { Category } from "../types";
 
-export const CATEGORY_CONFIG: Record<Category, {
+type TopicConfig = {
   label: string;
   primary: string;
   text: string;
   bg: string;
   border: string;
   glow: string;
-}> = {
+};
+
+// Known topics — extend as new course subjects are added.
+// For any topic not listed here the FALLBACK config is used automatically.
+const KNOWN_TOPICS: Record<string, TopicConfig> = {
   linux: {
     label: "Linux",
     primary: "#f59e0b",
@@ -33,6 +37,47 @@ export const CATEGORY_CONFIG: Record<Category, {
     border:  "rgba(59,130,246,0.28)",
     glow:    "rgba(59,130,246,0.12)",
   },
+  docker: {
+    label: "Docker",
+    primary: "#06b6d4",
+    text:    "#22d3ee",
+    bg:      "rgba(6,182,212,0.1)",
+    border:  "rgba(6,182,212,0.28)",
+    glow:    "rgba(6,182,212,0.12)",
+  },
+  kubernetes: {
+    label: "Kubernetes",
+    primary: "#6366f1",
+    text:    "#818cf8",
+    bg:      "rgba(99,102,241,0.1)",
+    border:  "rgba(99,102,241,0.28)",
+    glow:    "rgba(99,102,241,0.12)",
+  },
+  ansible: {
+    label: "Ansible",
+    primary: "#ef4444",
+    text:    "#f87171",
+    bg:      "rgba(239,68,68,0.1)",
+    border:  "rgba(239,68,68,0.28)",
+    glow:    "rgba(239,68,68,0.12)",
+  },
+  terraform: {
+    label: "Terraform",
+    primary: "#8b5cf6",
+    text:    "#a78bfa",
+    bg:      "rgba(139,92,246,0.1)",
+    border:  "rgba(139,92,246,0.28)",
+    glow:    "rgba(139,92,246,0.12)",
+  },
+  bash: {
+    label: "Bash",
+    primary: "#f59e0b",
+    text:    "#fbbf24",
+    bg:      "rgba(245,158,11,0.1)",
+    border:  "rgba(245,158,11,0.28)",
+    glow:    "rgba(245,158,11,0.12)",
+  },
+  // "homework" kept for backward compat with old DB records
   homework: {
     label: "Homework",
     primary: "#8b5cf6",
@@ -43,6 +88,28 @@ export const CATEGORY_CONFIG: Record<Category, {
   },
 };
 
+/** Generic fallback for any topic not in KNOWN_TOPICS */
+const FALLBACK: TopicConfig = {
+  label: "Topic",
+  primary: "#64748b",
+  text:    "#94a3b8",
+  bg:      "rgba(100,116,139,0.1)",
+  border:  "rgba(100,116,139,0.28)",
+  glow:    "rgba(100,116,139,0.12)",
+};
+
+/** Get config for any topic string, with automatic fallback. */
+export function getTopicConfig(topic: string): TopicConfig {
+  return KNOWN_TOPICS[topic?.toLowerCase()] ?? FALLBACK;
+}
+
+/** Backward-compat export used by LabCard and LabDetail. */
+export const CATEGORY_CONFIG: Record<string, TopicConfig> = new Proxy(KNOWN_TOPICS, {
+  get(target, key: string) {
+    return target[key] ?? FALLBACK;
+  },
+});
+
 interface Props {
   category: Category;
   active?: boolean;
@@ -50,7 +117,7 @@ interface Props {
 }
 
 export function CategoryChip({ category, active, onClick }: Props) {
-  const cfg = CATEGORY_CONFIG[category];
+  const cfg = getTopicConfig(category);
   return (
     <motion.button
       onClick={onClick}
@@ -81,7 +148,7 @@ export function CategoryChip({ category, active, onClick }: Props) {
           display: "inline-block",
         }}
       />
-      {cfg.label}
+      {cfg.label !== "Topic" ? cfg.label : category}
     </motion.button>
   );
 }
