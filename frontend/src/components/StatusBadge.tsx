@@ -6,6 +6,7 @@ const CONFIG: Record<string, { label: string; color: string; bg: string; border:
   solving:  { label: "Solving",  color: "#60a5fa", bg: "rgba(96,165,250,0.08)",  border: "rgba(96,165,250,0.25)", pulse: true  },
   solved:   { label: "Solved",   color: "#34d399", bg: "rgba(52,211,153,0.08)",  border: "rgba(52,211,153,0.25)", pulse: false },
   failed:   { label: "Failed",   color: "#f87171", bg: "rgba(248,113,113,0.08)", border: "rgba(248,113,113,0.22)", pulse: false },
+  partial:  { label: "Partial",  color: "#fb923c", bg: "rgba(251,146,60,0.08)",  border: "rgba(251,146,60,0.22)",  pulse: false },
 };
 
 const FALLBACK = CONFIG.unsolved;

@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { Zap } from "lucide-react";
 import { Lab } from "../types";
 import { StatusBadge } from "./StatusBadge";
 import { CATEGORY_CONFIG } from "./CategoryChip";
@@ -8,7 +9,9 @@ interface Props { lab: Lab; index: number; }
 
 export function LabCard({ lab, index }: Props) {
   const navigate = useNavigate();
-  const cfg = CATEGORY_CONFIG[lab.category] ?? CATEGORY_CONFIG.linux;
+  // ai_topic is the AI-inferred subject (e.g. "python" for a Python homework)
+  const displayTopic = lab.ai_topic || lab.category;
+  const cfg = CATEGORY_CONFIG[displayTopic] ?? CATEGORY_CONFIG[lab.category] ?? CATEGORY_CONFIG.linux;
 
   return (
     <motion.article
@@ -42,17 +45,29 @@ export function LabCard({ lab, index }: Props) {
         background: `linear-gradient(90deg, transparent, ${cfg.primary}50, transparent)`,
       }} />
 
-      {/* row 1: category chip + status */}
+      {/* row 1: category chip + dynamic badge + status */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-        <div className="font-mono" style={{
-          display: "inline-flex", alignItems: "center", gap: "5px",
-          padding: "3px 8px", fontSize: "10px", fontWeight: 600,
-          letterSpacing: "0.06em", textTransform: "uppercase",
-          background: cfg.bg, border: `1px solid ${cfg.border}`,
-          borderRadius: "4px", color: cfg.text,
-        }}>
-          <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: cfg.primary, display: "inline-block" }} />
-          {cfg.label}
+        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+          <div className="font-mono" style={{
+            display: "inline-flex", alignItems: "center", gap: "5px",
+            padding: "3px 8px", fontSize: "10px", fontWeight: 600,
+            letterSpacing: "0.06em", textTransform: "uppercase",
+            background: cfg.bg, border: `1px solid ${cfg.border}`,
+            borderRadius: "4px", color: cfg.text,
+          }}>
+            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: cfg.primary, display: "inline-block" }} />
+            {displayTopic}
+          </div>
+          {lab.is_dynamic && (
+            <div title="Dynamic exercise — content is generated on demand" style={{
+              display: "inline-flex", alignItems: "center",
+              padding: "2px 6px", fontSize: "9px", fontWeight: 700,
+              borderRadius: "4px", color: "#fbbf24",
+              background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.22)",
+            }}>
+              <Zap size={8} />
+            </div>
+          )}
         </div>
         <StatusBadge status={lab.solution_status} size="xs" />
       </div>
