@@ -18,11 +18,12 @@ Real stdout/stderr replaces AI-guessed output. Failed steps trigger the repair l
 """
 import asyncio
 import json
+import time
 from datetime import datetime, timezone, timedelta
 
 _TZ = timezone(timedelta(hours=2))  # GMT+2
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -366,16 +367,77 @@ async def _batch_resolve(slugs: list[str]) -> None:
         await asyncio.sleep(1)
 
 
+# ── Sync rate limiter (in-memory, per IP) ──────────────────────────────────────
+
+_MAX_FAILURES   = 5     # wrong PINs before lockout
+_LOCKOUT_SECS   = 300   # 5-minute lockout after _MAX_FAILURES wrong PINs
+_COOLDOWN_SECS  = 30    # minimum gap between successful syncs (any IP)
+
+# ip → {"failures": int, "locked_until": float, "last_success": float}
+_sync_state: dict[str, dict] = {}
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    return forwarded.split(",")[0].strip() if forwarded else (request.client.host or "unknown")
+
+
+def _check_sync_rate(ip: str, pin_required: bool) -> None:
+    state = _sync_state.setdefault(ip, {"failures": 0, "locked_until": 0.0, "last_success": 0.0})
+    now = time.monotonic()
+
+    # Brute-force lockout (only applies when a PIN is required)
+    if pin_required and state["locked_until"] > now:
+        secs = int(state["locked_until"] - now) + 1
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many failed attempts — locked out for {secs}s",
+            headers={"Retry-After": str(secs)},
+        )
+
+    # Success cooldown (applies regardless of PIN)
+    if state["last_success"] > 0 and (now - state["last_success"]) < _COOLDOWN_SECS:
+        secs = int(_COOLDOWN_SECS - (now - state["last_success"])) + 1
+        raise HTTPException(
+            status_code=429,
+            detail=f"Sync cooldown — try again in {secs}s",
+            headers={"Retry-After": str(secs)},
+        )
+
+
+def _record_failure(ip: str) -> None:
+    state = _sync_state.setdefault(ip, {"failures": 0, "locked_until": 0.0, "last_success": 0.0})
+    state["failures"] += 1
+    if state["failures"] >= _MAX_FAILURES:
+        state["locked_until"] = time.monotonic() + _LOCKOUT_SECS
+        state["failures"] = 0  # reset counter so it's clean after lockout expires
+
+
+def _record_success(ip: str) -> None:
+    state = _sync_state.setdefault(ip, {"failures": 0, "locked_until": 0.0, "last_success": 0.0})
+    state["failures"] = 0
+    state["last_success"] = time.monotonic()
+
+
+# ── Sync endpoint ───────────────────────────────────────────────────────────────
+
 class SyncRequest(BaseModel):
     pin: str = ""
 
 
 @router.post("/sync")
-async def sync_labs(body: SyncRequest = SyncRequest(), session: Session = Depends(get_session)):
-    """Trigger manual re-scrape of the target site. PIN-protected when SYNC_PIN is set."""
-    if settings.sync_pin:
+async def sync_labs(request: Request, body: SyncRequest = SyncRequest(), session: Session = Depends(get_session)):
+    """Trigger manual re-scrape of the target site. PIN + rate-limit protected."""
+    ip = _client_ip(request)
+    pin_required = bool(settings.sync_pin)
+
+    _check_sync_rate(ip, pin_required)
+
+    if pin_required:
         if body.pin != settings.sync_pin:
+            _record_failure(ip)
             raise HTTPException(status_code=403, detail="Invalid PIN")
+
     fresh = await discover_labs()
     added, updated = 0, 0
     for lab in fresh:
@@ -395,6 +457,8 @@ async def sync_labs(body: SyncRequest = SyncRequest(), session: Session = Depend
             session.add(lab)
             added += 1
     session.commit()
+
+    _record_success(ip)
     return {"added": added, "updated": updated}
 
 
