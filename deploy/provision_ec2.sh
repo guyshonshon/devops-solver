@@ -5,7 +5,7 @@ set -euo pipefail
 #   AWS_REGION=eu-west-1 INSTANCE_PROFILE_NAME=EC2SSMInstanceProfile ./deploy/provision_ec2.sh
 
 REGION="${AWS_REGION:-eu-west-1}"
-INSTANCE_TYPE="${INSTANCE_TYPE:-t4g.small}"
+INSTANCE_TYPE="${INSTANCE_TYPE:-t4g.micro}"
 INSTANCE_PROFILE_NAME="${INSTANCE_PROFILE_NAME:-}"
 SG_NAME="${SECURITY_GROUP_NAME:-devops-solver-sg}"
 TAG_NAME="${INSTANCE_TAG_NAME:-devops-solver-prod}"
