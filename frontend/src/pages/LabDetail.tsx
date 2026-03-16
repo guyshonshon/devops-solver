@@ -72,7 +72,7 @@ export function LabDetail() {
   return (
     <TooltipProvider>
       <div style={{ minHeight: "100vh", background: "var(--bg)", paddingTop: "52px" }}>
-        <div style={{ maxWidth: tab === "solution" ? "1400px" : "900px", margin: "0 auto", padding: "36px 40px 64px", transition: "max-width 0.25s ease" }}>
+        <div className="lab-page-pad" style={{ maxWidth: tab === "solution" ? "1400px" : "900px", margin: "0 auto", padding: "36px 40px 64px", transition: "max-width 0.25s ease" }}>
 
           {/* Breadcrumb */}
           <div className="font-mono" style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", color: "var(--text-3)", marginBottom: "24px" }}>
