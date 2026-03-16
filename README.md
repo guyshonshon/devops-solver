@@ -155,7 +155,7 @@ devops-solver/
 
 ## License
 
-This project is open source and distributed under the repository license. See [LICENSE](LICENSE).
+This project is read-only, with backend and ci/cd open source and distributed under the repository license. See [LICENSE](LICENSE).
 
 ---
 
