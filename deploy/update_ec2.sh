@@ -154,7 +154,7 @@ BUILD_NUMBER=\$(git rev-list --count HEAD 2>/dev/null || echo "0")
 export BUILD_NUMBER
 echo "Build number: \${BUILD_NUMBER}"
 
-docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml build --build-arg "VITE_BUILD_NUMBER=\${BUILD_NUMBER}"
 docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
 if [[ -x deploy/install_runtime_guard.sh ]]; then
