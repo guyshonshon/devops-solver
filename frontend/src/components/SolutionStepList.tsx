@@ -289,12 +289,12 @@ export function SolutionStepList({ steps, questions = [] }: Props) {
                   </div>
                   <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
                 </div>
-                {question && (
+                {question && question.text && (
                   <div style={{
-                    fontSize: 13, color: 'var(--text-2)', lineHeight: 1.55,
-                    padding: '6px 2px',
+                    fontSize: 12, color: 'var(--text-2)', lineHeight: 1.55,
+                    padding: '4px 2px',
                   }}>
-                    {question.full_text || question.text}
+                    {question.text}
                   </div>
                 )}
               </div>

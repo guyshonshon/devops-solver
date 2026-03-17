@@ -1,13 +1,15 @@
 services:
   backend:
     build: ./backend
-    container_name: devops-solver-backend
+    container_name: hodidit-backend
     restart: unless-stopped
     env_file: .env
     volumes:
       - ./data:/app/data
+      - playwright-cache:/ms-playwright
     environment:
       - DATABASE_URL=sqlite:////app/data/devops_solver.db
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
@@ -17,7 +19,7 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: devops-solver-frontend
+    container_name: hodidit-frontend
     restart: unless-stopped
     depends_on:
       backend:
@@ -28,7 +30,7 @@ services:
   # Cloudflare tunnel (optional — needs TUNNEL_TOKEN in .env)
   cloudflared:
     image: cloudflare/cloudflared:latest
-    container_name: devops-solver-tunnel
+    container_name: hodidit-tunnel
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:
@@ -38,4 +40,4 @@ services:
     profiles: ["tunnel"]
 
 volumes:
-  data:
+  playwright-cache:

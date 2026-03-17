@@ -1,85 +1,95 @@
 #!/usr/bin/env bash
+# Deploy: git pull + docker rebuild on EC2 via SSM.
+# Called by GitHub Actions on every push to main.
 set -euo pipefail
 
-# One-command remote update over SSM.
-#
-# Examples:
-#   AWS_REGION=eu-west-1 INSTANCE_ID=i-0123456789abcdef0 ./deploy/update_ec2.sh
-#   AWS_REGION=eu-west-1 INSTANCE_TAG_NAME=devops-solver-prod ./deploy/update_ec2.sh
-#
-# Optional env vars:
-#   REPO_BRANCH=main
-#   APP_DIR=/opt/devops-solver
-
 REGION="${AWS_REGION:-eu-west-1}"
-INSTANCE_ID="${INSTANCE_ID:-}"
-INSTANCE_TAG_NAME="${INSTANCE_TAG_NAME:-devops-solver-prod}"
+INSTANCE_ID="${INSTANCE_ID:?Set EC2_INSTANCE_ID in GitHub secrets}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
-APP_DIR="${APP_DIR:-/opt/devops-solver}"
+APP_DIR="${APP_DIR:-/opt/hodidit}"
 
-if ! command -v jq >/dev/null 2>&1; then
-  echo "ERROR: jq is required for deploy/update_ec2.sh." >&2
-  exit 1
-fi
+aws_with_retry() {
+  local attempt=1
+  local max_attempts="${AWS_MAX_ATTEMPTS:-5}"
+  local delay="${AWS_RETRY_DELAY_SECONDS:-3}"
+  local output exit_code
 
-if [[ -z "${INSTANCE_ID}" ]]; then
-  INSTANCE_ID="$(aws ec2 describe-instances \
-    --region "${REGION}" \
-    --filters "Name=tag:Name,Values=${INSTANCE_TAG_NAME}" "Name=instance-state-name,Values=running" \
-    --query 'sort_by(Reservations[].Instances[], &LaunchTime)[-1].InstanceId' \
-    --output text)"
-fi
+  while true; do
+    if output=$("$@" 2>&1); then
+      printf '%s' "$output"
+      return 0
+    fi
 
-if [[ -z "${INSTANCE_ID}" || "${INSTANCE_ID}" == "None" ]]; then
-  echo "ERROR: could not resolve a running instance. Set INSTANCE_ID explicitly." >&2
-  exit 1
-fi
+    exit_code=$?
+    if [[ $attempt -ge $max_attempts ]]; then
+      printf '%s\n' "$output" >&2
+      return "$exit_code"
+    fi
 
-echo "Target instance: ${INSTANCE_ID} (region ${REGION})"
-echo "[1/4] Sending update command via SSM..."
+    printf 'WARN: AWS command failed (attempt %d/%d): %s\n' \
+      "$attempt" "$max_attempts" "$(printf '%s' "$output" | head -n 1)" >&2
+    attempt=$((attempt + 1))
+    sleep "$delay"
+  done
+}
 
-REMOTE_CMD="sudo -iu ubuntu bash -lc 'set -euo pipefail; cd ${APP_DIR}; git fetch origin; git checkout ${REPO_BRANCH}; git pull --ff-only origin ${REPO_BRANCH}; if ! docker compose -f docker-compose.prod.yml up -d --build >/tmp/devops-solver-update.log 2>&1; then tail -n 120 /tmp/devops-solver-update.log; exit 1; fi; if [ -x deploy/install_runtime_guard.sh ]; then deploy/install_runtime_guard.sh >>/tmp/devops-solver-update.log 2>&1 || true; fi; docker compose -f docker-compose.prod.yml ps; tail -n 40 /tmp/devops-solver-update.log'"
-PARAMS_JSON="$(jq -cn --arg c "${REMOTE_CMD}" '{commands:[$c]}')"
-
-COMMAND_ID="$(aws ssm send-command \
-  --region "${REGION}" \
-  --instance-ids "${INSTANCE_ID}" \
-  --document-name AWS-RunShellScript \
-  --comment "Update devops-solver on EC2" \
-  --parameters "${PARAMS_JSON}" \
-  --query 'Command.CommandId' \
-  --output text)"
-
-echo "[2/4] Command ID: ${COMMAND_ID}"
-echo "[3/4] Waiting for completion..."
-
-STATUS=""
-for _ in {1..240}; do
-  STATUS="$(aws ssm get-command-invocation \
-    --region "${REGION}" \
-    --command-id "${COMMAND_ID}" \
-    --instance-id "${INSTANCE_ID}" \
-    --query 'Status' \
-    --output text 2>/dev/null || true)"
-  case "${STATUS}" in
-    Success|Failed|TimedOut|Cancelled|Undeliverable|Terminated)
-      break
-      ;;
-  esac
-  sleep 3
+# Wait for SSM agent
+echo "Waiting for SSM on $INSTANCE_ID..."
+PING=""
+for _ in {1..60}; do
+  PING=$(aws_with_retry aws ssm describe-instance-information \
+    --region "$REGION" \
+    --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+    --query 'InstanceInformationList[0].PingStatus' \
+    --output text || true)
+  [[ "$PING" == "None" || "$PING" == "[]" ]] && PING=""
+  [[ "$PING" == "Online" ]] && break
+  sleep 5
 done
+[[ "$PING" == "Online" ]] || { echo "ERROR: SSM not online for $INSTANCE_ID" >&2; exit 1; }
 
-echo "[4/4] Fetching command output..."
-aws ssm get-command-invocation \
-  --region "${REGION}" \
-  --command-id "${COMMAND_ID}" \
-  --instance-id "${INSTANCE_ID}" \
+# Build remote script (variables expanded locally before sending)
+# SSM runs with /bin/sh — re-exec with bash for pipefail + [[ support
+REMOTE=$(cat <<SCRIPT
+[ -n "\$BASH_VERSION" ] || exec /bin/bash "\$0" "\$@"
+export HOME=/root
+git config --global --add safe.directory ${APP_DIR} 2>/dev/null || true
+cd ${APP_DIR}
+APP_DIR=${APP_DIR} REPO_BRANCH=${REPO_BRANCH} ./deploy/deploy_on_instance.sh
+SCRIPT
+)
+
+echo "Sending deploy command..."
+COMMAND_ID=$(aws_with_retry aws ssm send-command \
+  --region "$REGION" \
+  --instance-ids "$INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --parameters "$(jq -cn --arg cmd "$REMOTE" '{commands:[$cmd]}')" \
+  --query 'Command.CommandId' \
+  --output text)
+
+echo "Command ID: $COMMAND_ID"
+STATUS=""
+i=0
+while true; do
+  STATUS=$(aws_with_retry aws ssm get-command-invocation \
+    --region "$REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+    --query 'Status' --output text || true)
+  case "$STATUS" in
+    Success|Failed|TimedOut|Cancelled|Undeliverable|Terminated) break ;;
+  esac
+  i=$((i+1))
+  elapsed=$((i*5))
+  printf "\r[%ds] Status: %-20s" "$elapsed" "${STATUS:-pending}"
+  sleep 5
+  [[ $i -ge 300 ]] && { echo; echo "ERROR: Timed out after 25 min" >&2; exit 1; }
+done
+echo  # newline after progress line
+
+aws_with_retry aws ssm get-command-invocation \
+  --region "$REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
   --query '{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
   --output json
 
-if [[ "${STATUS}" != "Success" ]]; then
-  echo "Update failed with status: ${STATUS}" >&2
-  exit 1
-fi
-
-echo "Update completed successfully."
+[[ "$STATUS" == "Success" ]] || { echo "ERROR: Deploy failed: $STATUS" >&2; exit 1; }
+echo "Deploy complete."

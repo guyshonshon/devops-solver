@@ -13,11 +13,6 @@ export function LabCard({ lab, index }: Props) {
   const displayTopic = lab.ai_topic || lab.category;
   const cfg = CATEGORY_CONFIG[displayTopic] ?? CATEGORY_CONFIG[lab.category] ?? CATEGORY_CONFIG.linux;
 
-  // Original question text — prefer page_title (exact scraped title), fall back to title
-  const originalQuestion = lab.page_title && lab.page_title !== lab.title
-    ? lab.page_title
-    : null;
-
   return (
     <motion.article
       initial={{ opacity: 0, y: 14 }}
@@ -77,20 +72,10 @@ export function LabCard({ lab, index }: Props) {
         <StatusBadge status={lab.solution_status} size="xs" />
       </div>
 
-      {/* AI-generated title */}
-      <h3 style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)", lineHeight: 1.45, marginBottom: originalQuestion ? "5px" : "8px" }}>
+      {/* title */}
+      <h3 style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)", lineHeight: 1.45, marginBottom: "8px" }}>
         {lab.title}
       </h3>
-
-      {/* Original question text (page_title) */}
-      {originalQuestion && (
-        <p className="font-mono" style={{
-          fontSize: "10px", color: "var(--text-3)", lineHeight: 1.5, marginBottom: "10px",
-          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
-        }}>
-          {originalQuestion}
-        </p>
-      )}
 
       {/* Bottom row: subcategory + AI SUMMARY chip */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
@@ -99,7 +84,7 @@ export function LabCard({ lab, index }: Props) {
         </p>
 
         {lab.summary && (
-          <Tooltip delayDuration={200}>
+          <Tooltip delayDuration={150}>
             <TooltipTrigger asChild>
               <span
                 onClick={(e) => e.stopPropagation()}
@@ -122,13 +107,31 @@ export function LabCard({ lab, index }: Props) {
               side="top"
               style={{
                 maxWidth: 260,
-                whiteSpace: "normal",
-                lineHeight: 1.65,
-                padding: "8px 12px",
-                fontSize: "11px",
+                padding: 0,
+                background: "rgba(10,14,28,0.92)",
+                border: `1px solid ${cfg.border}`,
+                borderRadius: 8,
+                backdropFilter: "blur(12px)",
+                boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px ${cfg.border}`,
+                overflow: "hidden",
               }}
             >
-              {lab.summary}
+              {/* mini card header */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "7px 11px 6px",
+                borderBottom: `1px solid ${cfg.border}`,
+                background: cfg.bg,
+              }}>
+                <span style={{ width: 5, height: 5, borderRadius: "50%", background: cfg.primary, display: "inline-block", flexShrink: 0 }} />
+                <span className="font-mono" style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: cfg.text }}>
+                  AI Summary
+                </span>
+              </div>
+              {/* body */}
+              <div style={{ padding: "9px 12px", fontSize: 11, color: "#dde4f0", lineHeight: 1.65, whiteSpace: "normal" }}>
+                {lab.summary}
+              </div>
             </TooltipContent>
           </Tooltip>
         )}
