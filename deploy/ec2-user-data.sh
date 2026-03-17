@@ -1,30 +1,12 @@
 #!/usr/bin/env bash
-set -euxo pipefail
+# Runs on first boot. Keep this minimal so SSM stays reachable;
+# bootstrap.sh installs Docker after the instance is confirmed Online.
+set -euo pipefail
 
-export DEBIAN_FRONTEND=noninteractive
-
-apt-get update
-apt-get install -y --no-install-recommends ca-certificates curl git gnupg lsb-release
-
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-chmod a+r /etc/apt/keyrings/docker.asc
-
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "${VERSION_CODENAME}") stable" \
-  > /etc/apt/sources.list.d/docker.list
-
-apt-get update
-apt-get install -y --no-install-recommends docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-systemctl enable docker
-systemctl start docker
+APP_DIR="/opt/hodidit"
 
 if id ubuntu >/dev/null 2>&1; then
-  usermod -aG docker ubuntu
-  install -d -o ubuntu -g ubuntu /opt/devops-solver
+  install -d -o ubuntu -g ubuntu "$APP_DIR"
 else
-  install -d /opt/devops-solver
+  install -d "$APP_DIR"
 fi
-
