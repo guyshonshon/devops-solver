@@ -1,9 +1,16 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useLocation } from "react-router-dom";
 
 export function Navbar() {
   const { pathname } = useLocation();
   const isActive = (p: string) => pathname === p || pathname.startsWith(p + "/");
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
+  useEffect(() => {
+    const fn = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, []);
 
   return (
     <header style={{
@@ -16,7 +23,7 @@ export function Navbar() {
     }}>
       <div className="navbar-inner" style={{
         maxWidth: "1200px", width: "100%", margin: "0 auto",
-        padding: "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: isMobile ? "0 16px" : "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <Link to="/dashboard" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "10px" }}>
           <div className="font-mono" style={{
@@ -26,7 +33,7 @@ export function Navbar() {
           }}>
             Ho<span style={{ color: "#f97316" }}>did</span>it
           </div>
-          <span className="font-mono" style={{ fontSize: "10px", color: "#4a607a" }}>by Guy Shonshon</span>
+          {!isMobile && <span className="font-mono" style={{ fontSize: "10px", color: "#4a607a" }}>by Guy Shonshon</span>}
         </Link>
 
         <nav style={{ display: "flex", alignItems: "center", gap: "2px" }}>
