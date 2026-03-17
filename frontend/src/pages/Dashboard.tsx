@@ -12,8 +12,19 @@ import { Category, Lab } from "../types";
 
 const ALL_CATS: Category[] = ["linux", "git", "python", "homework"];
 
+function useIsMobile() {
+  const [mobile, setMobile] = useState(() => window.innerWidth < 640);
+  useEffect(() => {
+    const fn = () => setMobile(window.innerWidth < 640);
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, []);
+  return mobile;
+}
+
 export function Dashboard() {
   const [filter, setFilter] = useState<string>("all");
+  const isMobile = useIsMobile();
   const countRefs = useRef<(HTMLSpanElement | null)[]>([]);
 
   const { data: labs = [], isLoading } = useQuery({
@@ -66,15 +77,15 @@ export function Dashboard() {
           transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
           style={{ paddingTop: "80px", borderBottom: "1px solid var(--border)" }}
         >
-          <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "44px 40px 36px" }}>
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "32px", flexWrap: "wrap" }}>
+          <div style={{ maxWidth: "1200px", margin: "0 auto", padding: isMobile ? "28px 16px 24px" : "44px 40px 36px" }}>
+            <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "flex-end", justifyContent: "space-between", gap: isMobile ? "16px" : "32px", flexWrap: "wrap" }}>
 
               {/* Left */}
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <p className="font-mono" style={{ fontSize: "10px", color: "var(--text-3)", letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: "10px" }}>
                   DevSecOps· Let's hope hodi won't find out :)
                 </p>
-                <h1 style={{ fontSize: "34px", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em", lineHeight: 1.1, marginBottom: "8px" }}>
+                <h1 style={{ fontSize: isMobile ? "26px" : "34px", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em", lineHeight: 1.1, marginBottom: "8px" }}>
                   Dashboard
                 </h1>
                 <p className="font-mono" style={{ fontSize: "12px", color: "var(--text-2)" }}>
@@ -83,7 +94,7 @@ export function Dashboard() {
               </div>
 
               {/* Right — stats strip */}
-              <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: "10px", overflow: "hidden" }}>
+              <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: "10px", overflow: "hidden", flexShrink: 0 }}>
                 {[
                   { label: "Labs", refIdx: 0, color: "#60a5fa" },
                   { label: "Mastered", refIdx: 1, color: "#34d399" },
@@ -91,16 +102,16 @@ export function Dashboard() {
                   <div
                     key={i}
                     style={{
-                      padding: "16px 28px",
+                      padding: isMobile ? "10px 16px" : "16px 28px",
                       textAlign: "center",
                       borderRight: i < 1 ? "1px solid var(--border)" : "none",
                       background: "var(--surface)",
                     }}
                   >
-                    <div className="font-mono" style={{ fontSize: "24px", fontWeight: 700, color, lineHeight: 1, marginBottom: "5px" }}>
+                    <div className="font-mono" style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 700, color, lineHeight: 1, marginBottom: "4px" }}>
                       <span ref={(el) => { countRefs.current[refIdx] = el; }}>–</span>
                     </div>
-                    <div className="font-mono" style={{ fontSize: "10px", color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.15em" }}>
+                    <div className="font-mono" style={{ fontSize: "9px", color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.12em" }}>
                       {label}
                     </div>
                   </div>
@@ -129,25 +140,24 @@ export function Dashboard() {
 
         {/* ── Solving queue ────────────────────────────────── */}
         {!isLoading && labs.some(l => l.solution_status === "solving" || l.solution_status === "unsolved") && (
-          <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "20px 40px 0" }}>
+          <div style={{ maxWidth: "1200px", margin: "0 auto", padding: isMobile ? "16px 16px 0" : "20px 40px 0" }}>
             <SolvingQueue labs={labs} />
           </div>
         )}
 
-
         {/* ── Category breakdown ──────────────────────────── */}
         {!isLoading && total > 0 && (
-          <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "12px 40px 0" }}>
-            <CategoryBreakdown labs={labs} />
+          <div style={{ maxWidth: "1200px", margin: "0 auto", padding: isMobile ? "12px 16px 0" : "12px 40px 0" }}>
+            <CategoryBreakdown labs={labs} activeFilter={filter} onFilterChange={setFilter} isMobile={isMobile} />
           </div>
         )}
 
         {/* ── Filter row ──────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}
-          style={{ maxWidth: "1200px", margin: "0 auto", padding: "20px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}
+          style={{ maxWidth: "1200px", margin: "0 auto", padding: isMobile ? "12px 16px" : "20px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
             {/* All button */}
             <button
               onClick={() => setFilter("all")}
@@ -159,26 +169,17 @@ export function Dashboard() {
                 background: filter === "all" ? "rgba(59,130,246,0.1)" : "transparent",
                 color: filter === "all" ? "#60a5fa" : "var(--text-2)",
                 cursor: "pointer", transition: "all 0.15s",
+                WebkitTapHighlightColor: "transparent",
               }}
             >
               All
               <span style={{ fontSize: "10px", opacity: 0.6 }}>{total}</span>
             </button>
 
-            {ALL_CATS.map((cat) => {
-              const count = labs.filter((l) => l.category === cat).length;
-              const s = labs.filter((l) => l.category === cat && l.solved).length;
-              return (
-                <Tooltip key={cat}>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <CategoryChip category={cat} active={filter === cat} onClick={() => setFilter(filter === cat ? "all" : cat)} />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{s}/{count} solved</TooltipContent>
-                </Tooltip>
-              );
-            })}
+            {/* Category chips — no Tooltip wrapper so touch events fire immediately */}
+            {ALL_CATS.map((cat) => (
+              <CategoryChip key={cat} category={cat} active={filter === cat} onClick={() => setFilter(filter === cat ? "all" : cat)} />
+            ))}
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -187,7 +188,7 @@ export function Dashboard() {
         </motion.div>
 
         {/* ── Lab grid ────────────────────────────────────── */}
-        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "4px 40px 64px" }}>
+        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: isMobile ? "4px 16px 48px" : "4px 40px 64px" }}>
           {isLoading ? (
             <SkeletonGrid />
           ) : filtered.length === 0 ? (
@@ -295,14 +296,20 @@ function SolvingQueue({ labs }: { labs: Lab[] }) {
 
 // ── Category breakdown strip ────────────────────────────────────────────────
 
-function CategoryBreakdown({ labs }: { labs: Lab[] }) {
+function CategoryBreakdown({ labs, activeFilter, onFilterChange, isMobile }: {
+  labs: Lab[];
+  activeFilter: string;
+  onFilterChange: (cat: string) => void;
+  isMobile: boolean;
+}) {
   const categories = [...new Set(labs.map(l => l.category))];
+  const cols = isMobile ? Math.min(categories.length, 2) : Math.min(categories.length, 4);
 
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: `repeat(${Math.min(categories.length, 4)}, 1fr)`,
-      gap: 12, paddingBottom: 20,
+      gridTemplateColumns: `repeat(${cols}, 1fr)`,
+      gap: isMobile ? 8 : 12, paddingBottom: 20,
     }}>
       {categories.map((cat, i) => {
         const cfg = getTopicConfig(cat);
@@ -310,6 +317,7 @@ function CategoryBreakdown({ labs }: { labs: Lab[] }) {
         const solved = catLabs.filter(l => l.solution_status === "solved").length;
         const solving = catLabs.filter(l => l.solution_status === "solving").length;
         const pct = catLabs.length > 0 ? Math.round((solved / catLabs.length) * 100) : 0;
+        const isActive = activeFilter === cat;
 
         return (
           <motion.div
@@ -317,12 +325,16 @@ function CategoryBreakdown({ labs }: { labs: Lab[] }) {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.06, duration: 0.25 }}
+            onClick={() => onFilterChange(isActive ? "all" : cat)}
             style={{
-              background: cfg.bg,
-              border: `1px solid ${cfg.border}`,
+              background: isActive ? cfg.bg : "rgba(255,255,255,0.02)",
+              border: `1px solid ${isActive ? cfg.border : "var(--border)"}`,
               borderRadius: 9,
-              padding: "14px 16px",
-              borderLeft: `3px solid ${cfg.primary}`,
+              padding: isMobile ? "10px 12px" : "14px 16px",
+              borderLeft: `3px solid ${isActive ? cfg.primary : "transparent"}`,
+              cursor: "pointer",
+              transition: "all 0.15s",
+              WebkitTapHighlightColor: "transparent",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>

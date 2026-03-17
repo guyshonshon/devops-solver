@@ -50,15 +50,19 @@ export function Intro() {
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const skipToEnd = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setDone(LINES.map(l => l.text));
+    setPartial("");
+    setLineIdx(LINES.length);
+    setPhase("ready");
+  };
+
   // Enter / Escape → skip to end immediately
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Enter" && e.key !== "Escape") return;
-      if (timerRef.current) clearTimeout(timerRef.current);
-      setDone(LINES.map(l => l.text));
-      setPartial("");
-      setLineIdx(LINES.length);
-      setPhase("ready");
+      skipToEnd();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -220,6 +224,24 @@ export function Intro() {
             </AnimatePresence>
           </div>
         </motion.div>
+
+        {/* Skip button — always visible during typing/name phases */}
+        {phase !== "ready" && (
+          <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+            <button
+              onClick={skipToEnd}
+              className="font-mono"
+              style={{
+                fontSize: 11, color: "rgba(249,115,22,0.45)",
+                background: "none", border: "none", cursor: "pointer",
+                padding: "10px 4px", letterSpacing: "0.1em",
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              skip →
+            </button>
+          </div>
+        )}
 
         {/* CTA */}
         <AnimatePresence>
