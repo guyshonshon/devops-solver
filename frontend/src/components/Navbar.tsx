@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 
 export function Navbar() {
   const { pathname } = useLocation();
-  const isActive = (p: string) => p === "/" ? pathname === "/" : pathname.startsWith(p);
+  const isActive = (p: string) => pathname === p || pathname.startsWith(p + "/");
 
   return (
     <header style={{
@@ -18,7 +18,7 @@ export function Navbar() {
         maxWidth: "1200px", width: "100%", margin: "0 auto",
         padding: "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
-        <Link to="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "10px" }}>
+        <Link to="/dashboard" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "10px" }}>
           <div className="font-mono" style={{
             fontSize: "13px", fontWeight: 700, letterSpacing: "0.02em",
             color: "#dde5f0", padding: "4px 10px",
@@ -30,7 +30,7 @@ export function Navbar() {
         </Link>
 
         <nav style={{ display: "flex", alignItems: "center", gap: "2px" }}>
-          {[{ to: "/", label: "Dashboard" }, { to: "/labs", label: "Labs" }].map(({ to, label }) => (
+          {[{ to: "/dashboard", label: "Dashboard" }, { to: "/labs", label: "Labs" }].map(({ to, label }) => (
             <Link key={to} to={to} style={{ textDecoration: "none" }}>
               <motion.div
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
