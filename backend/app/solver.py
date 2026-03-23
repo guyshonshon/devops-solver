@@ -143,13 +143,24 @@ Return the JSON solution now. No markdown, no extra text."""
 
 # ── Response validation ──────────────────────────────────────────────────────
 
-def _validate(data: dict) -> None:
-    if "steps" not in data or not isinstance(data["steps"], list):
-        raise ValueError("Response missing 'steps' array")
-    if not data["steps"]:
-        raise ValueError("Steps array is empty")
-    if "summary" not in data:
-        raise ValueError("Response missing 'summary'")
+def _make_validate(question_numbers: list[int]):
+    """Return a validator that also checks every question has at least one step."""
+    def _validate(data: dict) -> None:
+        if "steps" not in data or not isinstance(data["steps"], list):
+            raise ValueError("Response missing 'steps' array")
+        if not data["steps"]:
+            raise ValueError("Steps array is empty")
+        if "summary" not in data:
+            raise ValueError("Response missing 'summary'")
+        if question_numbers:
+            refs = {int(s["question_ref"]) for s in data["steps"] if s.get("question_ref") is not None}
+            missing = sorted(set(question_numbers) - refs)
+            if missing:
+                raise ValueError(
+                    f"Missing question_ref for question(s): {missing}. "
+                    f"Every question must have at least one step."
+                )
+    return _validate
 
 
 # ── Public API ───────────────────────────────────────────────────────────────
@@ -175,12 +186,18 @@ async def solve_lab(
 
     prompt = _build_prompt(category, title, content, questions_raw, subcategory, previous_error)
 
+    # Build a validator that enforces every question is answered
+    questions = json.loads(questions_raw) if questions_raw else []
+    q_numbers = [q.get("number", q.get("id")) for q in questions if q.get("number") or q.get("id")]
+    q_numbers = [int(n) for n in q_numbers if n is not None]
+    validate_fn = _make_validate(q_numbers)
+
     data = await asyncio.to_thread(
         call_with_retries,
         client=client,
         system_instruction=SYSTEM_INSTRUCTION,
         prompt=prompt,
-        validate_fn=_validate,
+        validate_fn=validate_fn,
     )
 
     normalise_steps(data["steps"])
