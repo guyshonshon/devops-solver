@@ -1,53 +1,127 @@
 # hoDIDit
 
 [![Build & Deploy](https://github.com/guyshonshon/hodidit/actions/workflows/deploy.yml/badge.svg)](https://github.com/guyshonshon/hodidit/actions/workflows/deploy.yml)
+![Healthcheck](https://img.shields.io/badge/healthcheck-/health-2ea44f)
+![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/frontend-React-61DAFB?logo=react&logoColor=061a23)
+![Docker Compose](https://img.shields.io/badge/runtime-Docker%20Compose-2496ED?logo=docker&logoColor=white)
+![AWS SSM](https://img.shields.io/badge/deploy-AWS%20SSM-FF9900?logo=amazonaws&logoColor=white)
+![SQLite](https://img.shields.io/badge/storage-SQLite-003B57?logo=sqlite&logoColor=white)
+![Python 3.11](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)
+![License](https://img.shields.io/github/license/guyshonshon/hodidit)
 
-> AI-forged DevOps lab solutions, with clean walkthroughs and a live sandbox.
+hoDIDit is an autonomous DevOps lab-solving platform that watches a source GitHub curriculum, detects new exercises, generates structured solutions with AI, validates executable Python steps, and presents the result through an interactive web interface.
 
-Hodidit discovers labs, solves them with AI, and presents them as step-by-step guides you can replay and test.
+Originally built around the idea of "homework that solves itself," the project turns that concept into a production-minded workflow for the [DevSecOps-22](https://hothaifa96.github.io/DevSecOps22/) course.
 
-Built for the [DevSecOps-22](https://hothaifa96.github.io/DevSecOps22/) course.
+## Overview
 
----
+The platform is designed as a continuous pipeline rather than a one-off solver:
 
-## Highlights
+- discover content directly from the target GitHub repository
+- classify whether a lab is directly solvable, dynamically generated, or ambiguous
+- generate a structured solution with an LLM
+- execute Python steps in a sandbox and repair failures when needed
+- persist clean, replayable results
+- serve the solution in a React dashboard with live progress, execution replay, and browser-side sandboxing
 
-- Automatic lab discovery and classification
-- Structured AI-generated solutions with expected outputs
-- Interactive walkthrough UI with syntax highlighting
-- Browser-based Python sandbox (Pyodide)
-- Repair loop for failed Python steps
+This keeps the system useful both as an automation engine and as a learning surface.
 
----
+## How It Works
 
-## What It Does
+1. **Discovery**
+   On startup, and then on a recurring scheduler, the backend walks the target repository tree configured by `TARGET_GITHUB_REPO`. Supported content paths are converted into internal `Lab` records automatically, so new labs can appear without manual registration.
 
-On startup, the backend scans source content, classifies each lab, and sends unsolved items through the solver pipeline. Results are persisted and served to the frontend as guided steps.
+2. **Detection of newly added labs**
+   When a new file is added to the target GitHub repo, the next sync identifies its path as a new lab slug, stores it in the database, and queues it for background solving.
 
-- Auto-discovery from source content
-- Exercise-type classification before solving
-- AI-generated, stepwise responses
-- Retry/repair loop for broken Python steps
-- Cached solutions for fast repeat access
+3. **Classification**
+   Before solving, the backend classifies each exercise to decide whether it is a normal lab, content that requires a "Generate" interaction, or something ambiguous enough to skip for manual review.
 
----
+4. **Dynamic content handling**
+   If the source page hides the real task behind a generate action, Playwright opens the page, triggers the generation flow, and extracts the actual content before sending it to the solver.
 
-## Stack
+5. **AI solution generation**
+   The solver asks the configured provider, OpenAI or Gemini, to return strict JSON containing summary metadata and a sequence of actionable steps such as shell commands, Git actions, Docker commands, and complete Python scripts.
 
-| Layer | Technology |
-|---|---|
-| Backend | Python, FastAPI, SQLModel, SQLite |
-| Frontend | React, TypeScript, Vite |
-| AI | OpenAI and Gemini provider support |
-| Infra | Docker Compose, EC2, Cloudflare Tunnel |
+6. **Verification and repair**
+   Python steps are executed in an isolated temporary sandbox. Real stdout and stderr replace guessed output. If execution fails, the repair loop sends the exact failure back to the model and retries until the solution is corrected or the retry budget is exhausted.
 
----
+7. **Persistence and presentation**
+   Final user-facing steps are stored separately from internal repair logs. The frontend then renders the result as an explorable walkthrough, an animated execution replay, and an editable browser sandbox for Python tasks.
 
-## Local Run
+8. **Optional publication**
+   Solved labs can also be pushed into a GitHub repository as generated solution files and a pull request through the optional GitHub integration.
+
+## Architecture
+
+| Layer | Responsibility | Main Technologies |
+| --- | --- | --- |
+| Source ingestion | Recursively reads the target course repository, parses markdown/HTML, extracts questions, detects dynamic labs | GitHub API, `httpx`, BeautifulSoup, Playwright |
+| Orchestration | Startup seeding, scheduled sync, solve pipeline, API surface, auth | FastAPI, APScheduler |
+| Intelligence | Exercise classification, solution generation, repair loop, provider abstraction | OpenAI, Gemini |
+| Verification | Executes Python-only steps, captures real output, feeds repair loop | Async subprocess sandbox |
+| Persistence | Stores labs, solutions, progress logs, prompts, metadata | SQLModel, SQLite |
+| Experience | Dashboard, lab detail view, animated solution replay, in-browser Python sandbox | React, TypeScript, Vite, React Query, Pyodide |
+| Runtime | Local dev, container orchestration, remote deployment, health recovery | Docker Compose, EC2, AWS SSM, Cloudflare Tunnel |
+
+## Frontend Experience
+
+The frontend is not just a result viewer.
+
+- The intro route frames the product as the realization of coursework automation, then moves into the main dashboard.
+- The dashboard tracks discovered labs, solved coverage, category breakdowns, and live solve progress.
+- Each lab page separates source content from the generated solution and exposes replay, reforge, and optional GitHub publishing actions.
+- Python steps can be re-run in the browser through Pyodide with editable inputs and variable overrides, while backend-verified outputs remain the canonical record.
+
+## Operational Model
+
+### Docker
+
+The runtime is intentionally compact:
+
+- `backend` runs the API, scheduler, scraper, solver, and sandbox verification flow
+- `frontend` serves the built React application through Nginx and proxies `/api` to the backend
+- `cloudflared` is optional and exposes the stack without opening inbound ports
+
+The backend container includes a `/health` endpoint and Compose health checks. The frontend waits for the backend to become healthy before starting in both production and development configurations.
+
+### DevOps Lifecycle
+
+The project follows a simple operational loop:
+
+- GitHub Actions runs a build check on every push to `main`
+- successful builds deploy to EC2 through AWS SSM, not SSH
+- the instance rebuilds and restarts the Compose stack in place
+- a runtime guard systemd timer periodically ensures the stack is up and restarts the backend if health degrades
+- persistent data lives outside the containers, while Playwright browser binaries are cached in a mounted volume
+
+This keeps the deployment path narrow, auditable, and aligned with a no-open-ports approach.
+
+## Shell Scripts
+
+The `deploy/` directory is the operational control plane for the project.
+
+| Script | Role |
+| --- | --- |
+| `create_ec2_ssm_role.sh` | Creates the IAM role and instance profile required for SSM-managed instances |
+| `provision_ec2.sh` | Provisions a fresh EC2 host for the application |
+| `bootstrap.sh` | Performs first-time instance setup, syncs runtime files, builds the stack, and validates health |
+| `update_ec2.sh` | Standard deployment entrypoint used by GitHub Actions for ongoing updates |
+| `deploy_on_instance.sh` | Instance-side deploy routine for syncing the repository and restarting Compose |
+| `install_runtime_guard.sh` | Installs the systemd runtime guard that revives the stack and protects backend health |
+| `create_github_deploy_user.sh` | Creates the limited AWS identity used by GitHub Actions deployments |
+| `ec2-user-data.sh` | Keeps first-boot EC2 user data intentionally minimal so SSM comes up cleanly |
+
+Taken together, these scripts define the infrastructure lifecycle: provision, bootstrap, update, and recover.
+
+## Local Development
+
+Create an environment file and start the stack:
 
 ```bash
 cp .env.example .env
-docker compose up -d
+docker compose up -d --build
 ```
 
 For hot-reload development:
@@ -56,214 +130,36 @@ For hot-reload development:
 docker compose -f docker-compose.dev.yml up --build
 ```
 
+Typical local endpoints:
 
----
+- app: `http://localhost:3000`
+- frontend dev server: `http://localhost:5173`
+- backend API: `http://localhost:8000`
 
-## Production Deployment
-
-Production is designed around:
-
-- EC2 as the runtime host
-- SSM as the only control/deploy path
-- Cloudflare Tunnel as the public entrypoint
-- Docker Compose for service orchestration
-
-Deployment helpers are in `deploy/`.
-
-### Which Shell Script Does What
-
-These are not all meant to be run every time.
-
-- `create_ec2_ssm_role.sh`
-  One-time AWS setup. Creates the EC2 IAM role and instance profile so the machine can register with SSM.
-
-- `provision_ec2.sh`
-  Create a fresh EC2 instance. This is the script to use when replacing the server.
-
-- `bootstrap.sh`
-  First deploy only. Run this from your laptop after the instance is online in SSM. It installs Docker on the host, clones the repo, copies your local `.env`, copies your local-only `docker-compose.prod.yml`, and starts the stack.
-
-- `update_ec2.sh`
-  Normal deploy path after the server already exists. This is what GitHub Actions runs on pushes to `main`.
-
-- `deploy_on_instance.sh`
-  The actual remote deploy script that runs on the EC2 host. `update_ec2.sh` calls this over SSM. You generally do not run this directly from your laptop.
-
-- `install_runtime_guard.sh`
-  Installs a small systemd timer on the instance so the Compose stack comes back after reboot and the backend is restarted if it becomes unhealthy.
-
-- `create_github_deploy_user.sh`
-  One-time GitHub Actions credential setup. Creates the minimal IAM user/policy used by the workflow.
-
-- `ec2-user-data.sh`
-  Very small first-boot script for EC2. It intentionally does almost nothing so SSM comes up cleanly.
-
-### Practical Deploy Procedure
-
-There are only three real phases:
-
-1. One-time AWS setup
-2. First deploy to a fresh server
-3. Normal ongoing deploys
-
-### 1. One-Time AWS Setup
-
-Create the EC2 SSM role/profile:
-
-```bash
-AWS_REGION=eu-west-1 \
-EC2_ROLE_NAME=hodidit-ec2-ssm-role \
-INSTANCE_PROFILE_NAME=hodidit-ec2-profile \
-./deploy/create_ec2_ssm_role.sh
-```
-
-Create the GitHub Actions deploy user and access key:
-
-```bash
-AWS_REGION=eu-west-1 \
-GITHUB_DEPLOY_USER_NAME=hodidit-gh-deploy \
-CREATE_ACCESS_KEY=1 \
-./deploy/create_github_deploy_user.sh
-```
-
-Put the returned values into GitHub repository secrets:
-
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-
-Also set this GitHub repository variable:
-
-- `AWS_REGION=eu-west-1`
-
-### 2. First Deploy To A Fresh Server
-
-Provision the machine:
-
-```bash
-AWS_REGION=eu-west-1 \
-INSTANCE_PROFILE_NAME=hodidit-ec2-profile \
-INSTANCE_TAG_NAME=hodidit-prod \
-./deploy/provision_ec2.sh
-```
-
-By default this provisions an Ubuntu 24.04 ARM `t4g.micro` with a `20 GB` root disk and no inbound ports.
-
-Then run the first deploy from your laptop:
-
-```bash
-AWS_REGION=eu-west-1 \
-INSTANCE_ID=<new-instance-id> \
-REPO_URL=https://github.com/<you>/hodidit.git \
-./deploy/bootstrap.sh
-```
-
-What `bootstrap.sh` does:
-
-- waits for SSM to become usable
-- installs Docker and Docker Compose on the instance
-- clones the repo into `/opt/hodidit`
-- copies your local `.env` to `/opt/hodidit/.env`
-- copies your local-only `docker-compose.prod.yml` to `/opt/hodidit/docker-compose.prod.yml`
-- runs `docker compose up -d --build`
-- installs the runtime guard
-
-Important:
-
-- `.env` is expected to exist locally before you run `bootstrap.sh`
-- `docker-compose.prod.yml` is intentionally local-only and not committed; `bootstrap.sh` copies it to the server for the first deploy
-- after this first deploy, the server already has both files, so regular deploys do not need them copied again
-
-After bootstrap succeeds, set this GitHub secret:
-
-- `EC2_INSTANCE_ID=<new-instance-id>`
-
-### 3. Normal Ongoing Deploys
-
-Once the server is initialized, deploys are simple:
-
-- push to `main`
-- GitHub Actions runs `.github/workflows/deploy.yml`
-- the workflow calls `deploy/update_ec2.sh`
-- `update_ec2.sh` sends an SSM command to the instance
-- on the instance, `deploy/deploy_on_instance.sh` does `git fetch`, `git checkout`, `git pull`, and `docker compose up -d --build`
-
-You only need `bootstrap.sh` again when replacing the EC2 instance or rebuilding from scratch.
-
----
-
-## CI/CD
-
-Every push to `main` triggers `.github/workflows/deploy.yml`:
-
-1. **Build check** — backend lint, frontend build
-2. **Deploy** — on success, runs `deploy/update_ec2.sh`, which waits for SSM, sends the remote deploy command, and prints the SSM result
-
-No SSH or open inbound ports are required. GitHub Actions needs:
-
-- Secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `EC2_INSTANCE_ID`
-- Variable: `AWS_REGION` (defaults to `eu-west-1` if omitted)
-
----
-
-## Management CLI
-
-```bash
-python manage.py list-solutions
-python manage.py clear-solutions --slug <slug>
-python manage.py clear-solutions
-```
-
----
-
-## Pipeline Overview
+## Project Shape
 
 ```text
-Discover labs -> classify -> solve with AI -> validate/repair -> persist -> serve to UI
+.
+├── backend/     # FastAPI API, discovery, solving, sandbox, repair, scheduling
+├── frontend/    # React UI, execution replay, browser sandbox
+├── deploy/      # EC2, SSM, bootstrap, runtime-guard, deploy scripts
+├── .github/     # CI/CD workflow
+├── manage.py    # Small management CLI for stored solutions
+└── docker-compose*.yml
 ```
 
----
+## Notes
 
-## Project Structure
-
-```text
-hodidit/
-├── .github/workflows/deploy.yml   # Build check + EC2 deploy on push to main
-├── backend/
-│   └── app/
-│       ├── classifier.py
-│       ├── solver.py
-│       ├── repairer.py
-│       ├── scraper.py
-│       ├── sandbox.py
-│       └── routers/
-├── frontend/
-│   └── src/
-│       ├── pages/
-│       ├── components/
-│       └── lib/
-├── deploy/
-│   ├── create_ec2_ssm_role.sh
-│   ├── create_github_deploy_user.sh
-│   ├── provision_ec2.sh
-│   ├── ec2-user-data.sh
-│   ├── deploy_on_instance.sh
-│   ├── bootstrap.sh
-│   ├── install_runtime_guard.sh
-│   └── update_ec2.sh
-├── manage.py
-├── docker-compose.yml
-├── docker-compose.dev.yml
-└── .env.example
-```
-
----
+- Solutions are cache-first: once a lab is solved, stored steps are replayed until a manual reforge is requested.
+- Internal attempt history and repair traces are intentionally kept out of user-facing responses.
+- API access, sync triggers, and re-solve actions can be protected with shared secrets or PINs depending on the environment.
 
 ## License
 
-This project is read-only, with backend and ci/cd open source and distributed under the repository license. See [LICENSE](LICENSE).
-
----
+Distributed under the repository license. See [`LICENSE`](LICENSE).
 
 ## Credits
 
 Created by **Guy Shonshon**.
+
+Course content is sourced from the DevSecOps-22 materials by Hothaifa's public course repository, while hoDIDit provides the ingestion, solving, verification, UI, and deployment workflow around it.
