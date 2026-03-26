@@ -11,6 +11,8 @@ const api = axios.create({
 export const configApi = {
   health: (): Promise<{ status: string; version: string; scrape_interval_minutes: number }> =>
     api.get("/health").then((r) => r.data),
+  meta: (): Promise<{ target_commit: string | null; target_repo: string; target_branch: string }> =>
+    api.get("/meta").then((r) => r.data),
 };
 
 export const labsApi = {

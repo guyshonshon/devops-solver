@@ -1,6 +1,8 @@
 import asyncio
+import time
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
@@ -12,6 +14,34 @@ from .auth import verify_api_key
 from .routers.labs import router as labs_router, _do_solve_pipeline
 from .scheduler import start_scheduler, stop_scheduler
 from .scraper import discover_labs
+
+# ── Target-repo commit cache ────────────────────────────────────────────────────
+_target_commit: dict = {"sha": None, "fetched_at": 0.0}
+_TARGET_COMMIT_TTL = 600  # seconds
+
+
+async def _fetch_target_commit() -> str | None:
+    """Return the HEAD commit SHA of the target course repo (hothaifa96/DevSecOps22)."""
+    now = time.monotonic()
+    if _target_commit["sha"] and now - _target_commit["fetched_at"] < _TARGET_COMMIT_TTL:
+        return _target_commit["sha"]
+    try:
+        repo = settings.target_github_repo
+        branch = settings.target_github_branch
+        headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+        if settings.github_token:
+            headers["Authorization"] = f"Bearer {settings.github_token}"
+        url = f"https://api.github.com/repos/{repo}/branches/{branch}"
+        async with httpx.AsyncClient(timeout=10, headers=headers) as client:
+            r = await client.get(url)
+            r.raise_for_status()
+            sha = r.json()["commit"]["sha"]
+        _target_commit["sha"] = sha
+        _target_commit["fetched_at"] = now
+        return sha
+    except Exception as exc:
+        print(f"[meta] Failed to fetch target commit: {exc}")
+        return _target_commit.get("sha")
 
 
 @asynccontextmanager
@@ -115,4 +145,15 @@ async def health():
         "status": "ok",
         "version": "1.0.0",
         "scrape_interval_minutes": settings.scrape_interval_minutes,
+    }
+
+
+@app.get("/meta")
+async def meta():
+    """Return target course repo metadata (latest commit SHA, repo path)."""
+    sha = await _fetch_target_commit()
+    return {
+        "target_commit": sha,
+        "target_repo": settings.target_github_repo,
+        "target_branch": settings.target_github_branch,
     }
