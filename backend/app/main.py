@@ -148,6 +148,16 @@ async def health():
     }
 
 
+@app.get("/health/badge")
+async def health_badge():
+    return {
+        "schemaVersion": 1,
+        "label": "health",
+        "message": "healthy",
+        "color": "brightgreen",
+    }
+
+
 @app.get("/meta")
 async def meta():
     """Return target course repo metadata (latest commit SHA, repo path)."""
