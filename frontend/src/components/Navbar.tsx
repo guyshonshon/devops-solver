@@ -4,6 +4,8 @@ import { Link, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { configApi, labsApi } from "../lib/api";
 
+const BUILD = import.meta.env.VITE_BUILD_NUMBER as string | undefined;
+
 export function Navbar() {
   const { pathname } = useLocation();
   const isActive = (p: string) => pathname === p || pathname.startsWith(p + "/");
@@ -76,6 +78,10 @@ export function Navbar() {
         </nav>
 
         <div className="font-mono" style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "10px", color: "#4a607a" }}>
+          {/* Build number */}
+          {BUILD && BUILD !== "dev" && (
+            <span style={{ opacity: 0.55 }}>#{BUILD}</span>
+          )}
           {/* Target course repo commit SHA */}
           {targetCommit && targetRepo && (
             <a
